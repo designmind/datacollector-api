@@ -15,6 +15,7 @@
  */
 package com.streamsets.pipeline.api.impl.annotationsprocessor;
 
+import com.streamsets.pipeline.api.ConnectionDef;
 import com.streamsets.pipeline.api.ElDef;
 import com.streamsets.pipeline.api.ErrorStage;
 import com.streamsets.pipeline.api.Executor;
@@ -82,6 +83,7 @@ public class PipelineAnnotationsProcessor extends AbstractProcessor {
   public static final String INTERCEPTORS_FILE = "Interceptors.json";
   public static final String STAGE_DEF_LIST_FILE = "StageDefList.json";
   public static final String DELEGATE_LIST_FILE = "Delegates.json";
+  public static final String CONNECTIONS_LIST_FILE = "Connections.json";
 
   private boolean skipProcessor;
   private ProcessingEnvironment processingEnv;
@@ -94,6 +96,7 @@ public class PipelineAnnotationsProcessor extends AbstractProcessor {
   private final List<String> interceptorClasses;
   private final List<String> delegateCLasses;
   private final List<String> stageDefJsonList;
+  private final List<String> connectionsClasses;
   private boolean error;
   private TypeMirror typeOfSource;
   private TypeMirror typeOfPushSource;
@@ -112,6 +115,7 @@ public class PipelineAnnotationsProcessor extends AbstractProcessor {
     interceptorClasses = new ArrayList<>();
     delegateCLasses = new ArrayList<>();
     stageDefJsonList = new ArrayList<>();
+    connectionsClasses = new ArrayList<>();
   }
 
   @Override
@@ -225,6 +229,17 @@ public class PipelineAnnotationsProcessor extends AbstractProcessor {
       }
     }
 
+    // Collect @ConnectionDef classes
+    for(Element e : roundEnv.getElementsAnnotatedWith(ConnectionDef.class)) {
+      if(e.getKind().isClass()) {
+        String className = ((TypeElement)e).getQualifiedName().toString();
+        connectionsClasses.add(className);
+      } else {
+        printError("'{}' is not a class, cannot be @ConnectionDef annotated", e);
+        error = true;
+      }
+    }
+
     // Generate files only if this is the last round and there is no error
     if(roundEnv.processingOver() && !error) {
       generateFiles();
@@ -246,6 +261,7 @@ public class PipelineAnnotationsProcessor extends AbstractProcessor {
     generateFile(INTERCEPTORS_FILE, interceptorClasses,"  \"", "\"");
     generateFile(DELEGATE_LIST_FILE, delegateCLasses,"  \"", "\"");
     generateFile(STAGE_DEF_LIST_FILE, stageDefJsonList," ", "");
+    generateFile(CONNECTIONS_LIST_FILE, connectionsClasses,"  \"", "\"");
   }
 
   static String toJson(List<String> elements) {
