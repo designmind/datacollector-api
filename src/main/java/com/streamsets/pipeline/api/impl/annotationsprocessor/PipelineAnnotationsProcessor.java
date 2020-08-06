@@ -16,6 +16,7 @@
 package com.streamsets.pipeline.api.impl.annotationsprocessor;
 
 import com.streamsets.pipeline.api.ConnectionDef;
+import com.streamsets.pipeline.api.ConnectionVerifierDef;
 import com.streamsets.pipeline.api.ElDef;
 import com.streamsets.pipeline.api.ErrorStage;
 import com.streamsets.pipeline.api.Executor;
@@ -67,7 +68,9 @@ import java.util.Set;
     "com.streamsets.pipeline.api.credential.CredentialStoreDef",
     "com.streamsets.pipeline.api.service.ServiceDef",
     "com.streamsets.pipeline.api.delegate.StageLibraryDelegateDef",
-    "com.streamsets.pipeline.api.interceptor.InterceptorDef"
+    "com.streamsets.pipeline.api.interceptor.InterceptorDef",
+    "com.streamsets.pipeline.api.ConnectionDef",
+    "com.streamsets.pipeline.api.ConnectionVerifierDef"
 })
 @SupportedSourceVersion(SourceVersion.RELEASE_8)
 @SupportedOptions(PipelineAnnotationsProcessor.SKIP_PROCESSOR)
@@ -84,6 +87,7 @@ public class PipelineAnnotationsProcessor extends AbstractProcessor {
   public static final String STAGE_DEF_LIST_FILE = "StageDefList.json";
   public static final String DELEGATE_LIST_FILE = "Delegates.json";
   public static final String CONNECTIONS_LIST_FILE = "Connections.json";
+  public static final String CONNECTION_VERIFIERS_LIST_FILE = "ConnectionVerifiers.json";
 
   private boolean skipProcessor;
   private ProcessingEnvironment processingEnv;
@@ -97,6 +101,7 @@ public class PipelineAnnotationsProcessor extends AbstractProcessor {
   private final List<String> delegateCLasses;
   private final List<String> stageDefJsonList;
   private final List<String> connectionsClasses;
+  private final List<String> connectionVerifiersClasses;
   private boolean error;
   private TypeMirror typeOfSource;
   private TypeMirror typeOfPushSource;
@@ -116,6 +121,7 @@ public class PipelineAnnotationsProcessor extends AbstractProcessor {
     delegateCLasses = new ArrayList<>();
     stageDefJsonList = new ArrayList<>();
     connectionsClasses = new ArrayList<>();
+    connectionVerifiersClasses = new ArrayList<>();
   }
 
   @Override
@@ -240,6 +246,17 @@ public class PipelineAnnotationsProcessor extends AbstractProcessor {
       }
     }
 
+    // Collect @ConnectionVerifierDef classes
+    for(Element e : roundEnv.getElementsAnnotatedWith(ConnectionVerifierDef.class)) {
+      if(e.getKind().isClass()) {
+        String className = ((TypeElement)e).getQualifiedName().toString();
+        connectionVerifiersClasses.add(className);
+      } else {
+        printError("'{}' is not a class, cannot be @ConnectionVerifierDef annotated", e);
+        error = true;
+      }
+    }
+
     // Generate files only if this is the last round and there is no error
     if(roundEnv.processingOver() && !error) {
       generateFiles();
@@ -262,6 +279,7 @@ public class PipelineAnnotationsProcessor extends AbstractProcessor {
     generateFile(DELEGATE_LIST_FILE, delegateCLasses,"  \"", "\"");
     generateFile(STAGE_DEF_LIST_FILE, stageDefJsonList," ", "");
     generateFile(CONNECTIONS_LIST_FILE, connectionsClasses,"  \"", "\"");
+    generateFile(CONNECTION_VERIFIERS_LIST_FILE, connectionVerifiersClasses,"  \"", "\"");
   }
 
   static String toJson(List<String> elements) {
